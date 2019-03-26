@@ -27,3 +27,7 @@ To answer the bandpass of 1000 Angstroms at a wavelength of 5000 Angstroms, divi
     * 5 * 3e2 = 1500 km s-1. 
     
     Not exactly radial velocity speeds. 
+    
+    **Q** Is there a Neon lamp data sheet?
+    
+    **A** https://www.digikey.com/en/pdf/v/vcc/cml-neon-application-information
