@@ -1,0 +1,56 @@
+Cut paste from https://wis-tns.weizmann.ac.il/astronotes/astronote/2019-8
+Little scratch pad file.
+
+  Catalog       Name          RA            DEC           Obj-Type  Redshift
+  TNS   2019ein [ATLAS19ieo]  13:53:29.134  +40:16:31.40  SN Ia-pec 0.007755      
+  
+  13:53:29.134  +40:16:31.40
+
+  13:53:29.134 208.37139166666665      +40:16:31.40 40.27538888888889
+
+Created  'folder' and a subfolder called 'usw'
+
+  -- mkdir -p $OBSERVATIONS/3May2019/usw
+  -- cd $OBSERVATIONS/3May2019/usw
+
+Fire up ds9
+   Analysis -> Image Servers -> STSCI 
+   in popup choose a red survey HaHa the red one has a satellite
+   through it!
+   SO DSS and heck with it
+   save the file in $OBSERVATIONS/3May2019/usw as NGC5353_Plan-DSS.fits
+   doctor up the image with grid, etc. 
+
+Then fire up planetarium program (XEphem my favorite), check --
+It transits at midnight.
+
+I saved this file in $OBSERVATIONS/3May2019/usw/NGC5353_Plan.txt
+
+I see a bright star in the field:
+Its HD 121129
+
+I want to know nearby Miles stars:
+
+ Miles Name |    ora    |   odec   |       simbadname        |  sptype   | Dist(deg) 
+------------+-----------+----------+-------------------------+-----------+-----------
+ HD123657   | 211.98233 | 43.85444 | HD123657                | M4 III    |      4.47
+ HD120933   | 207.94779 | 34.44425 | HD120933                | K5III     |      5.84
+ BD+342476  | 209.78950 | 33.86094 | BD+34 2476              | A4        |      6.51
+ HD127334   | 217.40338 | 41.79592 | HD127334                | G5V       |      6.98
+ HD124186   | 212.81300 | 32.29589 | HD124186                | K4 III    |      8.74
+ HD130817   | 222.27808 | 37.81117 | HD130817                | F2V       |     11.07
+ HD112413   | 194.00696 | 38.31839 | HD112413                | A0 spe    |     11.27
+ BD+302431  | 204.60317 | 29.36556 | BD+30 2431              | A2        |     11.34
+ HD127243   | 217.15754 | 49.84486 | HD127243                | G3 IV     |     11.39
+ HD123821   | 212.11438 | 51.59236 | HD123821                | G8IIIp    |     11.61
+ M3_398     | 205.51650 | 28.41911 | NGC 5272 398            | GB        |     12.09
+ M3_III-28  | 205.44083 | 28.41667 | Cl* NGC 5272 S I-III-28 | GB        |     12.10
+ M3_IV-25   | 205.40125 | 28.35667 | Cl* NGC 5272 S I-IV-25  | GB        |     12.17
+ HD126660   | 216.29917 | 51.85075 | HD126660                | F7 V      |     12.80
+ HD110897   | 191.24750 | 39.27892 | HD110897                | G0V       |     13.18
+ HD128167   | 218.67008 | 29.74514 | HD128167                | F2 V      |     13.47
+ HD126778   | 216.72567 | 28.58900 | HD126778                | K0III     |     13.55
+ HD109995   | 189.69833 | 39.30878 | HD109995                | A0 V (HB) |     14.35
+ HD119228   | 205.18446 | 54.68164 | HD119228                | M2III     |     14.56
+
+
