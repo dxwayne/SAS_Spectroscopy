@@ -1,0 +1,291 @@
+\documentclass[letter,11pt,oneside]{article}
+
+%%% (occur "\\(\\\\[a-z]*section\\|appendix\\|input\\|\\<include\\>\\)")
+
+%%\documentclass[11pt,twocolumn]{article}
+%%\usepackage[inline]{asymptote}   %% Inline asymptote diagrams
+%%\usepackage{wglatex}             %% Use this one and kill others.
+\usepackage{color}               %% colored letters {\color{red}{{text}}
+\usepackage{fancyhdr}            %% headers/footers
+%%\usepackage{fancyvrb}            %% headers/footers
+\usepackage{datetime}            %% pick up tex date time 
+\usepackage{lastpage}            %% support page of ...lastpage
+\usepackage{times}               %% native times roman fonts
+\usepackage{textcomp}            %% trademark
+\usepackage{amssymb,amsmath}     %% greek alphabet
+\usepackage{parskip}             %% blank lines between paragraphs, no indent
+\usepackage{shortvrb}            %% short verb use for tables
+\usepackage{lscape}              %% landscape for tables.
+\usepackage{longtable}           %% permit tables to span pages wg-longtable
+\usepackage{url}                 %% Make URLs uniform and links in PDFs
+\usepackage{enumerate}           %% Allow letters/decorations for enumerations
+\usepackage{endnotes}            %% Enhance footnotes/endnotes
+\usepackage{listings}            %% Make URLs uniform and links in PDFs
+\pdfadjustspacing=1                %% force LaTeX-like character spacing
+\usepackage{geometry}            %% allow margins to be relaxed
+%%\usepackage{wrapfig}             %% permit wrapping figures.
+%%\usepackage{subfigure}              %% images side by side.
+\geometry{margin=1in}            %% Allow narrower margins etc.
+\usepackage[T1]{fontenc}         %% Better Verbatim Font.
+\renewcommand*\ttdefault{txtt}   %% 
+%%\usepackage{natbib}   %% bibitems
+
+%% include background image (wg-document-page-background) 
+
+\usepackage{graphicx}            %% Include pictures into a document
+%% (wg-texdoc-inserttikz)
+
+
+\def\documentisdraft{NOTDRAFT}
+
+%% (wg-texdoc-isdraft)
+%% (wg-texdoc-insert-fancy-headers)
+
+%%\usepackage[bookmarks]{hyperref} %% Make huperlinks within a PDF
+%%\usepackage{makeidx}             %% Make an index uncomment following line
+%%\makeindex                       %%.. yeah this one, too. index{key} in text
+%%
+
+
+
+\definecolor{verbcolor}{rgb}{0.6,0,0}
+\definecolor{darkgreen}{rgb}{0,0.4,0}
+\newcommand\debate[1]{\textcolor{darkgreen}{DEBATE: #1} \marginpar{\textcolor{red}{DEBATE} }}
+\newcommand{\ltodo}[2]{\marginpar{\textcolor{red}{ACTION: #1}\endnote{#2}}}
+\renewcommand{\thefigure}{\thesection-\arabic{figure}}
+\newcommand{\menu}{\ensuremath{\;\rightarrow\;}}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\begin{document}
+
+
+%% (wg-latex-pretty-title-page)
+%% (wg-texdoc-titleblock)
+
+\setcounter{section}{0}
+\pagenumbering{arabic}
+
+\ifx\documentisdraft\drafttest
+\linenumbers    %%%%%%%%%%%%% DRAFT
+\fi
+
+\section{Astronomers Telegram  6 May 2019}
+Astronomers Telegram  6 May 2019
+
+\url{http://www.astronomerstelegram.org/}
+
+Analog of the CBAT, the Central Bureau for Astronomical Telegrams,
+actual telegrams were sent to people.
+
+CBATs carried a high cost of membership , information was essentially
+embargoed to their subscribers.  CBAT started soon after the IAU's
+creation in the early 1920s ran until until 2015, when the Commissions
+were disbanded. http://www.cbat.eps.harvard.edu/
+
+
+\url{http://www.astronomerstelegram.org/?read=12660}
+
+ATel reports on a number of astronomical events. 
+
+There are several highly specialized groups that may/may not report,
+and may report between themselves faster. Some are driven by
+researchers that know each other personally.  I know of instances,
+where one person observing at one observatory literally sending an
+email to another telescope operator asking for a quick peek at a
+target. Hey, get me a quick spectra of this thing. The telegram
+follows up hours later.
+
+A casual glance on 6 May 2016 in the MT local AM, with ``Show All''
+set, there were 3 telegrams for 5 May -- not a lot. Sometimes they
+pour in.
+
+One (so far) from 6 May. 
+
+\subsection{Using ATel}
+
+\vspace{-.15cm}
+\begin{enumerate}\addtolength{\itemsep}{-0.5\baselineskip}
+   \item   directly from their website. I do this over coffee on mornings when
+I have scopes looking for something to do.
+
+   \item   At the telescope, heck something exciting might happen
+
+   \item   email digests; Woody gets his at 9:00 AM, I get mine
+at 3:00p
+\end{enumerate}
+
+\subsection{Query with programs}
+
+It is possible to query ATel from within a program. The main access
+script is written in PERL (ugh) so will require some thought.
+
+
+\subsection{Account creation}
+
+Create an account, enter your email, a confirm link is sent via that
+email to you. You may then visit the email link (center top) and fill
+out the query. I get my emails at 15:00 local, time to get later
+notices and early enough to plan.
+
+Before getting an account, check the boxes and follow along for a
+while to get a feel for what happens.
+
+\subsection{Event history in the ATels}
+
+ATels that are related, have a list of previous (if any) ATels issued
+w.r.t. that object. You can click back and read about what has led up
+to the current point being made.
+
+There are often mag tables etc reporting observations.
+
+There are links outside of the ATel (usually to the home institution)
+for more data - like images of spectra, raw data whatever they
+want to offer.
+
+Short summary is one of the best places to find ToO (Target of Opportunity)
+requests and fast breaking Nova and Supernova reports. 
+
+\subsection{Types of observing}
+
+\vspace{-.15cm}
+\begin{enumerate}\addtolength{\itemsep}{-0.5\baselineskip}
+   \item  Photometry
+\vspace{-.15cm}
+\begin{enumerate}\addtolength{\itemsep}{-0.5\baselineskip}
+   \item    Variable star (check every week/year)
+   \item    Novae - ignore for years ATel and hit it hard (clear)
+   \item    narrow-band (low resolution spectroscopy)
+   \item    broad-band
+\end{enumerate}
+   \item  High Cadence Photometry
+   Occultations, star flicker
+
+   \item  Spectroscopy:
+\vspace{-.15cm}
+\begin{enumerate}\addtolength{\itemsep}{-0.5\baselineskip}
+   \item    point source
+   \item    longslit                                              
+   \item    slit-sliding (eliminate download times)
+   \item    slit-scanning
+   \item    integral field (lots of fibers make an 'image')
+\end{enumerate}
+
+   \item  Output:
+\vspace{-.15cm}
+\begin{enumerate}\addtolength{\itemsep}{-0.5\baselineskip}
+   \item    spectra
+   \item    data point
+   \item    time-series (novae asteroids)
+\end{enumerate}
+
+\end{enumerate}
+
+\subsection{Vocabulary}
+
+Time allocation committee - Write a proposal, get a fixed slot in telescopes
+   time -- it may rain!
+
+Queue observing -- to overcome some limitations, TAC says we need
+   data.  If something happens raise our weight in the queue. EG Dr Imke
+   Pater and infrared KECK observations of IO volcanoes. They go on their
+   own schedule.
+
+Automated surveys: PTF, ZWF, Catalina, PanSTARRS, space missions
+
+TESS - Transiting Exoplanet Survey Satellite -- looking for lots of
+   ground based observations
+
+LIGO - Laser Interferometer Gravitational-Wave Observatory 
+
+Call for Observations - somebody wants more data \\
+Target of Opportunity  (ToO) - somebody wants more data
+
+Coordinated Campaign - usually big project or space/based coordinated
+
+Alerts - AAVSO Alert system
+
+\subsection{Background sources: Surveys}
+
+POSS - Puckett Observatory Supernova Survey \\
+ -- amateur based 300+ discoveries
+
+Catalina Sky Survey   \\
+   \url{https://catalina.lpl.arizona.edu/}
+
+Polarmar Transient Factory - Caltech/Polamar related \url{https://www.ptf.caltech.edu/} \\
+Zwicky Transient Facility -  \url{https://www.ztf.caltech.edu/ }
+
+ASASSN - All Sky Automated Survey for Supernova \\
+   \url{http://www.astronomy.ohio-state.edu/~assassin/index.shtml}
+   
+OGLE    - scopes stare at rich patch of sky for microlensing \\
+  \url{http://ogle.astrouw.edu.pl/}
+ 
+ICECUBE - Neutrino  \\
+\url{https://icecube.wisc.edu/}
+
+LIGO (gravity wave) all hands on deck for the GW170817 event. \\
+\url{https://www.ligo.caltech.edu/}
+
+LCO \\
+\url{https://lco.global/}
+
+PanSTARRs \\
+\url{https://panstarrs.stsci.edu/}
+
+ATLAS The Asteroid Terrestrial-impact Last Alert System
+\url{http://www.ifa.hawaii.edu/info/press-releases/ATLAS/}
+
+Various space missions
+DAMPE-  (China) The DArk Matter Particle Explorer \\
+SWIFT \\
+INTEGRAL - INTErnational Gamma-Ray Astrophysics Laboratory \\
+NICER  Neutron Star Interior Composition Explorer (NICE too) \\
+Chandra \\
+NuSTAR
+
+MAXI Monitor of All-sky X-ray Image (MAXI) ISS (Japan) \\
+Fermi 
+
+etc...
+
+There are lots of space missions flying now.
+
+
+-- OK Now you have a tiger by the tail, how do you plan
+a set of observations?
+
+
+
+
+
+%%\appendix
+%%\renewcommand \thesection{\Alph{section}}
+
+%% use a bibitem approach to the references publications etc.
+%% (wg-bibitem)
+
+%%\clearpage
+%%\addcontentsline{toc}{section}{References}
+%%\renewcommand*{\refname}{My Bibliography and References}
+%%\bibliographystyle{plain}	% bibliographystyle{apalike} and \usepackage{natbib}
+%%\bibliography{MasterBib}	% expects file "MasterBib.bib"
+
+
+%%\clearpage
+%%\addcontentsline{toc}{section}{Index}
+%%\printindex %% www.cs.usask.ca/resources/tutorials/latex/notes/toc-index.pdf
+
+%%\begin{thebibliography}{80}
+%%\usepackage{natbib}   %% bibitems
+%%\end{thebibliography}
+
+% /home/wayne/git/SAS_Spectroscopy/doc/atel.tex
+
+%% (wg-texdoc-endnotes)
+\end{document}

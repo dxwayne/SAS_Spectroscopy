@@ -1,0 +1,161 @@
+\documentclass[letter,11pt,oneside]{article}
+
+%%% (occur "\\(\\\\[a-z]*section\\|appendix\\|input\\|\\<include\\>\\)")
+
+%%\documentclass[11pt,twocolumn]{article}
+%%\usepackage[inline]{asymptote}   %% Inline asymptote diagrams
+%%\usepackage{wglatex}             %% Use this one and kill others.
+\usepackage{color}               %% colored letters {\color{red}{{text}}
+\usepackage{fancyhdr}            %% headers/footers
+%%\usepackage{fancyvrb}            %% headers/footers
+\usepackage{datetime}            %% pick up tex date time 
+\usepackage{lastpage}            %% support page of ...lastpage
+\usepackage{times}               %% native times roman fonts
+\usepackage{textcomp}            %% trademark
+\usepackage{amssymb,amsmath}     %% greek alphabet
+\usepackage{parskip}             %% blank lines between paragraphs, no indent
+\usepackage{shortvrb}            %% short verb use for tables
+\usepackage{lscape}              %% landscape for tables.
+\usepackage{longtable}           %% permit tables to span pages wg-longtable
+\usepackage{url}                 %% Make URLs uniform and links in PDFs
+\usepackage{enumerate}           %% Allow letters/decorations for enumerations
+\usepackage{endnotes}            %% Enhance footnotes/endnotes
+\usepackage{listings}            %% Make URLs uniform and links in PDFs
+\pdfadjustspacing=1                %% force LaTeX-like character spacing
+\usepackage{geometry}            %% allow margins to be relaxed
+%%\usepackage{wrapfig}             %% permit wrapping figures.
+%%\usepackage{subfigure}              %% images side by side.
+\geometry{margin=1in}            %% Allow narrower margins etc.
+\usepackage[T1]{fontenc}         %% Better Verbatim Font.
+\renewcommand*\ttdefault{txtt}   %% 
+%%\usepackage{natbib}   %% bibitems
+
+%% include background image (wg-document-page-background) 
+
+\usepackage{graphicx}            %% Include pictures into a document
+%% (wg-texdoc-inserttikz)
+
+
+\def\documentisdraft{NOTDRAFT}
+
+%% (wg-texdoc-isdraft)
+%% (wg-texdoc-insert-fancy-headers)
+
+%%\usepackage[bookmarks]{hyperref} %% Make huperlinks within a PDF
+%%\usepackage{makeidx}             %% Make an index uncomment following line
+%%\makeindex                       %%.. yeah this one, too. index{key} in text
+%%
+
+
+
+\definecolor{verbcolor}{rgb}{0.6,0,0}
+\definecolor{darkgreen}{rgb}{0,0.4,0}
+\newcommand\debate[1]{\textcolor{darkgreen}{DEBATE: #1} \marginpar{\textcolor{red}{DEBATE} }}
+\newcommand{\ltodo}[2]{\marginpar{\textcolor{red}{ACTION: #1}\endnote{#2}}}
+\renewcommand{\thefigure}{\thesection-\arabic{figure}}
+\newcommand{\menu}{\ensuremath{\;\rightarrow\;}}
+
+
+
+
+
+%%(wg-texdoc-adjust-paper-width)%%Begin User Definitions: Hint: ~/.latex.defs and  latex.defs  
+%%End User Definitions:
+
+%% (wg-texdoc-insert-hypersetup)
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\begin{document}
+
+
+%% (wg-latex-pretty-title-page)
+%% (wg-texdoc-titleblock)
+
+\setcounter{section}{0}
+\pagenumbering{arabic}
+
+\ifx\documentisdraft\drafttest
+\linenumbers    %%%%%%%%%%%%% DRAFT
+\fi
+
+
+\section*{WD Exercise}
+
+A good exercise is to compare a set of observations of the 
+same non-varying target to make sure observatoin and reduction
+techniques are the same. White dwarf stars are good choices
+for this exercise. Problem is there are only a handful
+of bright WD stars available in the Northerh Hemisphere.
+
+Using TOPCAT, and the catalog selection service,
+and using SIMBAD as the source this query:
+
+\begingroup \fontsize{10pt}{10pt}
+\selectfont
+%%\begin{Verbatim} [commandchars=\\\{\}]
+\begin{verbatim} 
+select ra,dec,V,otype_txt,main_id,sp_type 
+   from  basic
+   join allfluxes on basic.oid = allfluxes.oidref
+where 
+   dec > -20 
+   and allfluxes.V < 11 
+   and otype_txt='WD*'
+\end{verbatim}
+\endgroup
+%% \end{Verbatim}
+
+returns this short list:
+
+\begingroup \fontsize{10pt}{10pt}
+\selectfont
+%%\begin{Verbatim} [commandchars=\\\{\}]
+\begin{verbatim} 
+# ra           dec      V     otype  main_id                      sp_type
+
+   65.2196   13.86442   6.14   WD*   "HD  27483"                  DA3+F6V
+
+    7.3150   55.96441  10.60   WD*   "LAMOST J002915.51+555753.4" DA?    
+  321.6806   41.12844  10.89   WD*   "LAMOST J212643.49+410741.5" DAZ?   
+   95.8393    2.95186  10.38   WD*   "LAMOST J062321.45+025706.7" DA?    
+  102.7807   13.22806  10.43   WD*   "BD+13  1437"                DA     
+   63.8407   -7.65811   9.52   WD*   "* omi02 Eri B"              DA2.9  
+  101.2887  -16.71686   8.43   WD*   "* alf CMa B"                DA1.9  
+  114.8245   5.22411   10.92   WD*   "* alf CMi B"                DQZ    
+\end{verbatim}
+\endgroup
+%% \end{Verbatim}
+
+Note: The very first one out of the box is a double star!
+
+
+
+%%\appendix
+%%\renewcommand \thesection{\Alph{section}}
+
+%% use a bibitem approach to the references publications etc.
+%% (wg-bibitem)
+
+%%\clearpage
+%%\addcontentsline{toc}{section}{References}
+%%\renewcommand*{\refname}{My Bibliography and References}
+%%\bibliographystyle{plain}	% bibliographystyle{apalike} and \usepackage{natbib}
+%%\bibliography{MasterBib}	% expects file "MasterBib.bib"
+
+
+%%\clearpage
+%%\addcontentsline{toc}{section}{Index}
+%%\printindex %% www.cs.usask.ca/resources/tutorials/latex/notes/toc-index.pdf
+
+%%\begin{thebibliography}{80}
+%%\usepackage{natbib}   %% bibitems
+%%\end{thebibliography}
+
+% /home/wayne/git/SAS_Spectroscopy/doc/SIMBAD.tex
+
+%% (wg-texdoc-endnotes)
+\end{document}
