@@ -4,7 +4,7 @@
 
 #############################################################################
 # 
-#  /home/wayne/git/SAS_Spectroscopy/py/__pycache__
+#  /home/wayne/git/SAS_Spectroscopy/py
 #
 #emacs helpers
 # (insert (buffer-file-name))
@@ -59,6 +59,33 @@ They include:
 --mean           <float>  mean count for darks   (350)
 --poisson        <bool>   apply poisson using -n value (False)  
 -v, --verbose    <bool>   be verbose about work    (False)
+
+A Atik 414ex camera, -5C 1800 second dark shows a mean value of 
+386.5 stddev of 561. This is an arrival rate of 
+(iv (setq tmp (/ 386.5 1800 )))    0.2147 per second
+
+Approach Assumptions:
+Each pixel is the same -> uniform image
+Each pixel is independent
+Each pixel is a combination of processes:
+   light capture ability
+   photon arrival
+   shift issues (CTE is a big one)
+   summing register
+   shift CTE in shifting summing register
+
+Operational Assumption:
+   An image is the sum of any source photons on top of 
+   the dark current (measured by a dark frame) on top
+   of a base (zero exposure). 
+
+Observations:
+   Atik 414EX   darks are pretty consistent, sigma grows with time
+   KAF 1602E    darks are pretty consistent, sigma grows with time
+   KAF 8300     darks are pretty consistent, sigma grows with time
+   KAF 1001e    dark grows linearly with time
+   Tek          So cold DC < 5
+
 """
 
 __author__ = 'Wayne Green'
