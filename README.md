@@ -5,13 +5,7 @@ Support training amateur astronomical spectroscopy observers, example image sets
 
 Download the git desktop utility. https://desktop.github.com/
 
-**Forum Like Use**
 
-Use the Projects Tab to visit open questions/discussions related to
-- Questions
-- Hardware
-- Software
-- Automation
 
 **Wiki**
 
