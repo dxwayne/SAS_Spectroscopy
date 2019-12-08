@@ -1,0 +1,453 @@
+#!/usr/bin/env python3
+# -*- coding: latin-1 -*-
+# HEREHEREHERE
+
+#############################################################################
+#
+#  /home/git/SAS_Spectroscopy/CameraEval/Files/example1.py
+#
+#emacs helpers
+# (insert (buffer-file-name))
+#
+# (ediff-current-file)
+# (wg-python-fix-pdbrc)
+# (find-file-other-frame "./.pdbrc")
+# (wg-python-fix-pdbrc)   # PDB DASH DEBUG end-comments
+#
+# (setq mypdbcmd (concat (buffer-file-name) "<args...>"))
+# (progn (wg-python-fix-pdbrc) (pdb mypdbcmd))
+#
+# (wg-astroconda-pdb)       # IRAF27
+# (wg-astroconda3-pdb)      # CONDA Python3
+#
+# (set-background-color "light blue")
+# (wg-python-toc)
+#
+#############################################################################
+# (wg-python-graphics)
+import copy
+import optparse
+import re
+import sys
+import os
+import numpy as np
+from astropy.io import fits
+import pydicom
+import pandas as pd
+
+
+__tzfmt__ = re.compile(r'([0-9]+):([0-9]+)')  # timezone
+
+__doc__ = """
+
+dicom2fits [options] files...
+
+First time make the templates:
+
+./dicom2fits --csvtemplate=log   --csvtemplate=site   --csvtemplate=instrument   --csvtemplate=observer
+
+Edit then use the templates:
+
+./dicom2fits -s site.csv -i instrument.csv -o observer.csv -l log.csv
+
+Options:
+   -l --log  A spreadsheet csv log file of format
+      filename
+      ccd temp
+      filter
+      filetype 'object','zero','dark','flat','domeflat','skyflat','focus'
+      exptime
+      catalog
+      objectid
+      ra
+      dec
+      ra-targ
+      dec-targ
+      object
+
+   -s --site   A spreadsheet csv file of format with site information
+      Site location....I prefer OBSGEO, that uses  IAU 1976 ellipsoid
+      XDATUM   [ prose of the geodetic datum for geo coords ]
+      OBSGEO-B Latitude [ degrees ]
+      OBSGEO-L Longitude [ degrees ]
+      OBSGEO-H Height above datum [ meters ]
+   -o --observers   A spreadsheet csv file with observer(s)
+      OBSERVER Fred Flintstone
+      OBSERV02 Wilma Flintstone
+      ...
+   -i --instrument A spreadsheet csv file describing the instrument
+      INSTRUME  [ prose of the instrument [site s/n]]
+      TELESCOP  [ prose of the telescope name ]
+      APERTURE  [ area of effective aperature in m-squared ]
+      FOCALLEN  [ effective focal length with barlow/reducer ]
+      CAMERA    [ prose of camera ]
+      DETECTOR  [ prose of the detector ]
+   -z --zone timezone (camera works in local time)
+
+The camera writes a very limited amount of information into its DICOM
+header. This program augments that data with
+
+1) A log file of the observing. One line per file,
+   filename, and the data
+2) A site file (probably have to make one of these for all observations)
+3) a list of observers
+4) a file to describe the instrument used.
+
+The -z switch sets the timezone. Really can not count on the system
+knowing this. Really, you can't. It is HH:MM w.r.t. Greenwich. Negative
+for WEST timezones. Mountain time is -06:00 during the summer and -05:00
+during winter.
+
+
+   [options] files...
+   CATALOG    [name of the database ]
+   OBJECT     [database main id prose ]
+   OBJECTID   [key for database ]
+   IMAGETYP   one of ['object','zero','dark','flat','domeflat','skyflat','focus' ]
+   FILTER     [prose name of filter at site ]
+   CCDSUM     [nx ny [residualx,residualy]] if n=3 and NAXIS mod n has a residual
+              residual can be stated. (IfA)
+   OBSERVER   OBSERVxx [ name of the observer(s) ]
+   SITE       [prose of telescope/observatory name ]
+   RA         [sexigesimal ra ]
+   DEC        [sexigesimal dec ]
+   RA-TARG    [decimal degrees ra ]  -- easier to work with
+   DEC-TARG   [decimal degrees dec ]
+   ROTANG     [rotation in degrees + is CCW range [0..360) ]
+   RADESYS    ICRS
+   DATE-OBS   [ YYYY-MM-DDTHH:MM:SS.SSSsssZ  start of obs]
+   DATE-MJD
+   TIMESYS    [ UTC (or other) ]
+   EXPTIME    [ time detector accepting photons ]
+   GAIN
+   RDNOISE (may be subjective)
+   INSTRUME  [ prose of the instrument [site s/n]]
+   TELESCOP  [ prose of the telescope name ]
+   APERTURE  [ area of effective aperature in m-squared ]
+   FOCALLEN  [ effective focal length with barlow/reducer ]
+   CAMERA    [ prose of camera ]
+   DETECTOR  [ prose of the detector ]
+
+   Data sections: Some detectros have more than one readout circuit. This
+   has significant implications in noise frames.
+   DATASEC[n] [data array (pixel) coordinates ]
+   CCDSEC[n]
+   DETSEC[n]
+   AMPSEC[n]
+   Site location....I prefer OBSGEO, that uses  IAU 1976 ellipsoid
+   XDATUM   [ prose of the geodetic datum for geo coords ]
+   OBSGEO-B Latitude [ degrees ]
+   OBSGEO-L Longitude [ degrees ]
+   OBSGEO-H Height above datum [ meters ]
+
+   BUT! our gps's use WGS-84, and that will change real soon.
+   All this can be handled in Astropy.
+
+   Other things like
+   AIRMASS
+   MOONANGL   [ degrees ]
+   SUNANGLE   [ degrees ]
+   EXPSTART   [ start of exposure in MJD ]
+   EXPEND     [ end of exposuire in MJD ]
+
+   ROOTNAME   [ root name of the file ]
+   FILETYPE   [ 'RAW IMAGE' ]
+
+
+"""
+
+
+header_template = {
+   "CATALOG"   : fits.Card( "CATALOG"    ,"",       "name of the database"),
+   "OBJECT"    : fits.Card( "OBJECT"     ,"",       "database main id prose"),
+   "OBJECTID"  : fits.Card( "OBJECTID"   ,"",       "key for database"),
+   "IMAGETYP"  : fits.Card( "IMAGETYP"   ,"object", "'zero','dark','object','flat','domeflat','skyflat','focus'"),
+   "FILTER"    : fits.Card( "FILTER"     ,"open",   "prose name of filter at site"),
+   "CCDSUM"    : fits.Card( "CCDSUM"     ,"1 1",    "nx ny"),
+   "OBSERVER"  : fits.Card( "OBSERVER"   ,"",       "name of the observer(s) OBSERVxx for more"),
+   "SITE"      : fits.Card( "SITE"       ,"",       "prose of telescope,observatory name"),
+   "RA"        : fits.Card( "RA"         ,"",       "sexigesimal ra"),
+   "DEC"       : fits.Card( "DEC"        ,"",       "sexigesimal dec"),
+   "RA-TARG"   : fits.Card( "RA-TARG"    ,"",       "decimal degrees ra"),
+   "DEC-TARG"  : fits.Card( "DEC-TARG"   ,"",       "decimal degrees dec"),
+   "ROTANG"    : fits.Card( "ROTANG"     ,"0",      "rotation in degrees + is CCWrange [0..360)"),
+   "RADESYS"   : fits.Card( "RADESYS"    ,"ICRS"    "FKS4 FKS4"),
+   "DATE-OBS"  : fits.Card( "DATE-OBS"   ,"",       "YYYY-MM-DDTHH:MM:SS.SSSsssZ start of obs"),
+   "DATE-MJD"  : fits.Card( "DATE-MJD"   ,"",       "computed"),
+   "TIMESYS"   : fits.Card( "TIMESYS"    ,"",       "UTC (or other)"),
+   "EXPTIME"   : fits.Card( "EXPTIME"    ,"",       "time detector accepting photons"),
+   "GAIN"      : fits.Card( "GAIN"       ,"",       "subjective"),
+   "RDNOISE"   : fits.Card( "RDNOISE"    ,"",       "subjective"),
+   "INSTRUME"  : fits.Card( "INSTRUME"   ,"",       "prose of the instrument [site s/n]"),
+   "TELESCOP"  : fits.Card( "TELESCOP"   ,"",       "prose of the telescope name"),
+   "APERTURE"  : fits.Card( "APERTURE"   ,"",       "area of effective aperature in m-squared"),
+   "FOCALLEN"  : fits.Card( "FOCALLEN"   ,"",       "effective focal length with barlow/reducer"),
+   "CAMERA"    : fits.Card( "CAMERA"     ,"",       "prose of camera"),
+   "DETECTOR"  : fits.Card( "DETECTOR"   ,"",       "prose of the detector"),
+   "TEMPERAT"  : fits.Card( "TEMPERAT"   ,"",       "Sensor Temperature [ deg c]"),
+   "DATASEC"   : fits.Card( "DATASEC"    ,"",       "default to NAXIS1,2"),
+   "XDATUM"    : fits.Card( "XDATUM"     ,"",       "prose of the geodetic datum for geo coords"),
+   "OBSGEO-B"  : fits.Card( "OBSGEO-B"   ,"",       "Latitude [ degrees ]"),
+   "OBSGEO-L"  : fits.Card( "OBSGEO-L"   ,"",       "Longitude [ degrees  ]"),
+   "OBSGEO-H"  : fits.Card( "OBSGEO-H"   ,"",       "Height above datum [ meters ]"),
+   "AIRMASS"   : fits.Card( "AIRMASS"    ,"",       "[computed]"),
+   "MOONANGL"  : fits.Card( "MOONANGL"   ,"",       "[degrees]"),
+   "SUNANGLE"  : fits.Card( "SUNANGLE"   ,"",       "[degrees]"),
+   "EXPSTART"  : fits.Card( "EXPSTART"   ,"",       "start of exposure in MJD"),
+   "EXPEND"    : fits.Card( "EXPEND"     ,"",       "end of exposuire in MJD"),
+   "ROOTNAME"  : fits.Card( "ROOTNAME"   ,"$HOME/AAATODAY", "root name of the file"),
+   "FILETYPE"  : fits.Card( "FILETYPE"   ,"RAW",    "prose 'CALIBRATED' or 'RAW'")
+   }
+
+# Spreadsheet comma separated, double-quoted text fields
+
+csv_template = """Keyword,Value,Comment
+"CATALOG","","name of the database"
+"OBJECT","","database main id prose"
+"OBJECTID","","key for database"
+"IMAGETYP","","'zero';'dark';'object';'flat';'domeflat';'skyflat';'focus'"
+"FILTER","","prose name of filter at site"
+"CCDSUM","","nx ny"
+"OBSERVER","","name of the observer(s) OBSERVxx for more"
+"RA","","sexigesimal ra"
+"DEC","","sexigesimal dec"
+"RA-TARG","","decimal degrees ra"
+"DEC-TARG","","decimal degrees dec"
+"ROTANG","","rotation in degrees + is CCWrange [0..360)"
+"RADESYS","ICRS"  "FKS4 FKS4"
+"DATE-OBS","","YYYY-MM-DDTHH:MM:SS.SSSsssZ start of obs"
+"DATE-MJD","","computed"
+"TIMESYS","UTC","UTC (or other)"
+"EXPTIME","","time detector accepting photons"
+"MOONANGL","","[degrees]"
+"SUNANGLE","","[degrees]"
+"EXPSTART","","start of exposure in MJD"
+"EXPEND","","end of exposuire in MJD"
+"ROOTNAME","","root name of the file"
+"FILETYPE","RAW","prose 'CALIBRATED' or 'RAW'"
+"""
+
+site_template = """Keyword,Value,Comment
+"SITE","","prose of telescope,observatory name"
+"XDATUM","","prose of the geodetic datum for geo coords"
+"OBSGEO-B","","Latitude [ degrees ]"
+"OBSGEO-L","","Longitude [ degrees  ]"
+"OBSGEO-H","","Height above datum [ meters ]"
+"AIRMASS","","[computed]"
+"""
+
+instrument_template = """Keyword,Value,Comment
+"GAIN","","subjective"
+"RDNOISE","","subjective"
+"INSTRUME","","prose of the instrument [site sn]"
+"TELESCOP","","prose of the telescope name"
+"APERTURE","","area of effective aperature in m-squared"
+"FOCALLEN","","effective focal length with barlow-reducer"
+"CAMERA","","prose of camera"
+"DETECTOR","","prose of the detector"
+"TEMPERAT","","Sensor temperature [ deg C]"
+"DATASEC","","default to NAXIS1,2"
+"""
+
+observer_template = """Keyword,Value,Comment
+"OBSERVER","HERO","Proimary observers name"
+"OBSERV01","SIDEKICK","Ancillary people"
+"""
+
+log_template = """\"filename","temperat","filter","filetype","exptime","catalog","objectid","ra","dec","ra-targ","dec-targ","object"
+"""
+
+__author__  = 'Wayne Green'
+__version__ = '0.1'
+
+
+##############################################################################
+# gencards
+#
+##############################################################################
+def gencards(setname,df,cards,mias):
+   """Given the pandas df for setname, add a new card to cards
+  array, or a message to mias"""
+   for idx,row in df.iterrows():
+      keyword,value,comment = row
+      if(missing(value)):
+         mias.append("{} keyword {} missing value.".format(setname,keyword))
+      if(not missing(comment)):
+         cards.append(fits.Card(keyword,value,comment))
+      else:
+         cards.append(fits.Card(keyword,value))
+# gencards
+
+##############################################################################
+# missing
+#
+##############################################################################
+def missing(val):
+   """See if val is a missing spreadsheet value"""
+   valtype = "{}".format(type(val)) # a real hack
+   ret = False
+   if('float' in valtype and np.isnan(val)):
+      ret = True
+   if('str' in valtype and val==''):
+      ret = True
+   return ret
+# missing
+
+##############################################################################
+#                                    Main
+#                               Regression Tests
+##############################################################################
+# HEREHEREHERE
+if __name__ == "__main__":
+   opts = optparse.OptionParser(usage="%prog "+__doc__)
+
+   opts.add_option("--header", action="store", dest="headerfile",
+                   default=None,
+                   help="<file>     csv file with default header values.")
+
+   opts.add_option("-z","--zone", action="store", dest="timezone",
+                   default="-05:00",
+                   help="<-HH:MM>     Timezone offset.")
+
+   opts.add_option("-l","--log", action="store", dest="logfile",
+                   default=None,
+                   help="<pathname>     fully qualified path to log file.")
+
+   opts.add_option("-s","--site", action="store", dest="site",
+                   default=None,
+                   help="<pathname>   fully qualified path to site file.")
+
+   opts.add_option("-i","--instrument", action="store", dest="instrument",
+                   default=None,
+                   help="<pathname>     fully qualified path to instrument file.")
+
+   opts.add_option("-o","--observers", action="store", dest="observers",
+                   default=None,
+                   help="<pathname>     fully qualified path to observers file.")
+
+   opts.add_option("-v", "--verbose", action="store_true", dest="verboseflag",
+                   default=False,
+                   help="<bool>     be verbose about work.")
+
+   opts.add_option("--csvtemplate", action="append", dest="csvtemplate",
+                   default=[],
+                   help="<log|site|instrument|observer>     dump csv image(s) and quit.")
+
+
+
+   (options, args) = opts.parse_args()
+ 
+   if(len(options.csvtemplate) != 0):
+      for template in options.csvtemplate:
+         {'log'        : lambda a : print(log_template,
+                                          file=open('log_template.csv','w')),
+          'site'       : lambda a : print(site_template,
+                                          file=open('site_template.csv','w')),
+          'instrument' : lambda a : print(instrument_template,
+                                          file=open('instrument_template.csv','w')),
+          'observer'   : lambda a : print(observer_template,
+                                          file=open('observer_template.csv','w'))
+         }.get(template,lambda a: print('Template option {} missing'.format(a),
+                   file=sys.stderr))(template)
+      sys.exit(0)
+
+   msg = ""
+
+   zone = options.timezone
+   m = __tzfmt__.match(zone)
+   if(m):
+      try:
+         zed = m.groups[0]+m.groups[1]
+      except:
+         msg += "Bad time zone"
+
+   logfile    = options.logfile
+   site       = options.site
+   instrument = options.instrument
+   observers  = options.observers
+   if logfile    is None: msg += "{} file missing".format("logfile")
+   if site       is None: msg += "{} file missing".format("site")
+   if instrument is None: msg += "{} file missing".format("instrument")
+   if observers  is None: msg += "{} file missing".format("observers")
+
+   if(msg != ""):
+      print(msg,file=sys.stdout)
+      print("Halting",file=sys.stdout)
+      sys.exit(1)
+
+   ###################################################################
+   #  All the parameters are sorta ok, lets proceed
+   ###################################################################
+   logcsv        = pd.read_csv(logfile)
+   sitecsv       = pd.read_csv(site)
+   instrumentcsv = pd.read_csv(instrument)
+   observerscsv  = pd.read_csv(observers)
+   if logcsv        is None: msg += "Error reading csv file {}".format("logfile")
+   if sitecsv       is None: msg += "Error reading csv file {}".format("site")
+   if instrumentcsv is None: msg += "Error reading csv file {}".format("instrument")
+   if observerscsv  is None: msg += "Error reading csv file {}".format("observers")
+   if(msg != ""):
+      print(msg,file=sys.stdout)
+      print("Halting",file=sys.stdout)
+      sys.exit(1)
+
+   # gen up a basic header
+   baseheader = fits.header.Header()  # completely empty, so nail in basics
+   baseheader.set("SIMPLE" , "T7"   , "conforms to FITS standard"  )
+   baseheader.set("BITPIX" , 16     , "array data type"            )
+   baseheader.set("NAXIS"  , 2      , "number of array dimensions" )
+   baseheader.set("NAXIS1" , 5472    )
+   baseheader.set("NAXIS2" , 3648    )
+   baseheader.set("EXTEND" , "T"     )
+   baseheader.set("BSCALE" , 1       )
+   baseheader.set("BZERO"  , 32768   )
+
+   mias  = []
+   cards = []
+   gencards("site"      ,sitecsv      ,cards, mias)
+   gencards("instrument",instrumentcsv,cards, mias)
+   gencards("observers" ,observerscsv ,cards, mias)
+   if(len(mias) != 0):
+      print('\n'.join(mias),file=sys.stdout)
+      sys.exit(1)
+
+   ###################################################################
+   #  OK all cards assembled OK
+   #
+   ###################################################################
+   for c in cards:
+      baseheader.append(c)
+
+   ###################################################################
+   #  Now we process each file, update base headers, and go for it.
+   #  "filename"
+   #  "ccdtemp"
+   #  "filter"
+   #  "filetype"
+   #  "exptime"
+   #  "catalog"
+   #  "objectid"
+   #  "ra"
+   #  "dec"
+   #  "ra-targ"
+   #  "dec-targ"
+   #  "object"
+   ###################################################################
+
+   #if(len(args) == 0 ): args.append(None)
+   h = {}
+   for idx,row in logcsv.iterrows():  # PDB-DEBUG
+      filename    = row['filename']
+      fileheader  = copy.deepcopy(baseheader)
+      headercards = fileheader.cards
+      for k,v in row.items():
+         hk = k.upper()
+         if(hk not in fileheader):
+            msg += "{} key not recognized".format(hk)
+         else:
+            card = headercards[hk].value = v
+
+      ds = pydicom.dcmread(filename)  # plan dataset
+      d  = ds.pixel_array
+      nf = fits.PrimaryHDU(d,fileheader)
+      nf.writeto('dc2w.fits',output_verify='fix',overwrite=True)
