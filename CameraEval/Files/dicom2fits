@@ -34,7 +34,8 @@ import numpy as np
 from astropy.io import fits
 import pydicom
 import pandas as pd
-
+import datetime
+import astropy.time as astime
 
 __tzfmt__ = re.compile(r'([0-9]+):([0-9]+)')  # timezone
 
@@ -401,6 +402,7 @@ if __name__ == "__main__":
    baseheader.set("EXTEND" , "T"     )
    baseheader.set("BSCALE" , 1       )
    baseheader.set("BZERO"  , 32768   )
+   baseheader.set("DATE-OBS"  , "2019-01-01T00:00:00.0Z"   )
 
    mias  = []
    cards = []
@@ -420,18 +422,26 @@ if __name__ == "__main__":
 
    ###################################################################
    #  Now we process each file, update base headers, and go for it.
-   #  "filename"
-   #  "ccdtemp"
-   #  "filter"
-   #  "filetype"
-   #  "exptime"
-   #  "catalog"
-   #  "objectid"
-   #  "ra"
-   #  "dec"
-   #  "ra-targ"
-   #  "dec-targ"
-   #  "object"
+   #  FITS              TUCSEN keywords
+   #  "filename"        'BitsAllocated'
+   #  "ccdtemp"         'BitsStored'
+   #  "filter"          'Columns'
+   #  "filetype"        'ContentDate'
+   #  "exptime"         'ContentTime'
+   #  "catalog"         'HighBit'
+   #  "objectid"        'InstitutionName'
+   #  "ra"              'Manufacturer'
+   #  "dec"             'ManufacturerModelName'
+   #  "ra-targ"         'NumberOfFrames'
+   #  "dec-targ"        'PhotometricInterpretation'
+   #  "object"          'PixelData'
+   #                    'PixelRepresentation'
+   #                    'PlanarConfiguration'
+   #                    'Rows'
+   #                    'SamplesPerPixel'
+   #                    'SeriesDate'
+   #                    'StudyDate'
+   #                    'StudyTime'
    ###################################################################
 
    #if(len(args) == 0 ): args.append(None)
@@ -448,6 +458,21 @@ if __name__ == "__main__":
             card = headercards[hk].value = v
 
       ds = pydicom.dcmread(filename)  # plan dataset
+      sdate = ds.data_element('StudyDate').value
+      tdate  = "{}-{}-{}".format(sdate[:4],sdate[4:6],sdate[6:])
+      stime = ds.data_element('StudyTime').value
+      stime = ds.data_element('StudyTime').value
+      
+      rawtimeobs = tdate+'T'+stime+'.0'
+      localdate = astime.Time([rawtimeobs]).datetime[0]
+      z = options.timezone
+      h,m = map(float,z.split(':'))
+      tdelta = datetime.timedelta(hours=h,minutes=m)
+      utctimeobs = localdate-tdelta
+      timeobs=utctimeobs.strftime("%Y-%m-%dT%H:%M:%S.0Z")
+      if('DATE-OBS' in fileheader):
+         card = headercards['DATE-OBS'].value = timeobs
       d  = ds.pixel_array
       nf = fits.PrimaryHDU(d,fileheader)
       nf.writeto('dc2w.fits',output_verify='fix',overwrite=True)
+
