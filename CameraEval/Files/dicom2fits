@@ -38,6 +38,7 @@ import datetime
 import astropy.time as astime
 
 __tzfmt__ = re.compile(r'([0-9]+):([0-9]+)')  # timezone
+__spaces__ = re.compile(r'[ ]+')
 
 __doc__ = """
 
@@ -458,6 +459,8 @@ if __name__ == "__main__":
             card = headercards[hk].value = v
 
       ds = pydicom.dcmread(filename)  # plan dataset
+      fitsfilename = __spaces__.sub('_','.'.join(filename.split('.')[:-1]+['fits']))
+      
       sdate = ds.data_element('StudyDate').value
       tdate  = "{}-{}-{}".format(sdate[:4],sdate[4:6],sdate[6:])
       stime = ds.data_element('StudyTime').value
@@ -474,5 +477,5 @@ if __name__ == "__main__":
          card = headercards['DATE-OBS'].value = timeobs
       d  = ds.pixel_array
       nf = fits.PrimaryHDU(d,fileheader)
-      nf.writeto('dc2w.fits',output_verify='fix',overwrite=True)
+      nf.writeto(fitsfilename,output_verify='fix',overwrite=True)
 
