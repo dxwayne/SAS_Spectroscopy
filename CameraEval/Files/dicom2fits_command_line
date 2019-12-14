@@ -1,0 +1,747 @@
+#!/usr/bin/env python3
+# -*- coding: latin-1 -*-
+# HEREHEREHERE
+
+#############################################################################
+#
+#  /home/git/SAS_Spectroscopy/CameraEval/Files/example1.py
+#
+##  https://doc.qt.io/qtforpython/PySide2/QtWidgets/QFileDialog.html
+
+# IExpress -- install 
+#
+#emacs helpers
+# (insert (buffer-file-name))
+#
+# (ediff-current-file)
+# (wg-python-fix-pdbrc)
+# (find-file-other-frame "./.pdbrc")
+# (wg-python-fix-pdbrc)   # PDB DASH DEBUG end-comments
+#
+# (setq mypdbcmd (concat (buffer-file-name) "<args...>"))
+# (progn (wg-python-fix-pdbrc) (pdb mypdbcmd))
+#
+# (wg-astroconda-pdb)       # IRAF27
+# (wg-astroconda3-pdb)      # CONDA Python3
+#
+# (set-background-color "light blue")
+# (wg-python-toc)
+#
+#
+# class DCM2FITSException(Exception):
+#    def __init__(self,message,errors=None):
+#    @staticmethod
+#    def __format__(e):
+#
+# class DCM2FITS(object):
+#    def __init__(self,filebase=""):                 # DCM2FITS::__init__()
+#    def readini(self):                              # DCM2FITS::readini
+#    def acquire_timezone(self):                     # DCM2FITS::acquire_timezone()
+#    def acquire_site(self):                         # DCM2FITS::acquire_site()
+#    def readini(self):                              # DCM2FITS""readini
+#    def acquire_site(self):                         # DCM2FITS::acquire_site()
+#    def acquire_instrument                          # DCM2FITS::acquire_instrument()
+#    def acquire_observer                            # DCM2FITS::acquire_observer()
+#    def acquire_log                                 # DCM2FITS::acquire_log()
+#    def initialize(self):                           # DCM2FITS::initialize()
+#    def debug(self,msg="",os=sys.stderr):           # DCM2FITS::debug()
+#    def generate_templates(self):                   # DCM2FITS::generate_templates()
+#    def missing(self,val):                          # DCM2FITS::missing()
+#    def gencards(self,setname,df,cards,mias):       # DCM2FITS::gencards()
+#    def convert(self):                              # DCM2FITS::convert()
+#
+#
+#
+#
+#############################################################################
+# (wg-python-graphics)
+import copy
+import optparse
+import re
+import sys
+import os
+import numpy as np
+from astropy.io import fits
+import pydicom
+import pandas as pd
+import datetime
+import astropy.time as astime
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore          import *
+from PyQt5.QtGui           import *
+from PyQt5.QtWidgets       import *
+from dcm2fits import Ui_DICOM2fits
+
+__tzfmt__ = re.compile(r'([0-9]+):([0-9]+)')  # timezone
+__spaces__ = re.compile(r'[ ]+')
+
+__author__  = 'Wayne Green'
+__version__ = '0.1'
+
+__doc__ = """
+
+dicom2fits [options] files...
+
+First time make the templates:
+
+./dicom2fits --csvtemplate=log   --csvtemplate=site   --csvtemplate=instrument   --csvtemplate=observer
+
+Edit then use the templates:
+
+./dicom2fits -s site.csv -i instrument.csv -o observer.csv -l log.csv
+
+Options:
+   -l --log  A spreadsheet csv log file of format
+      filename
+      ccd temp
+      filter
+      filetype 'object','zero','dark','flat','domeflat','skyflat','focus'
+      exptime
+      catalog
+      objectid
+      ra
+      dec
+      ra-targ
+      dec-targ
+      object
+
+   -s --site   A spreadsheet csv file of format with site information
+      Site location....I prefer OBSGEO, that uses  IAU 1976 ellipsoid
+      XDATUM   [ prose of the geodetic datum for geo coords ]
+      OBSGEO-B Latitude [ degrees ]
+      OBSGEO-L Longitude [ degrees ]
+      OBSGEO-H Height above datum [ meters ]
+   -o --observers   A spreadsheet csv file with observer(s)
+      OBSERVER Fred Flintstone
+      OBSERV02 Wilma Flintstone
+      ...
+   -i --instrument A spreadsheet csv file describing the instrument
+      INSTRUME  [ prose of the instrument [site s/n]]
+      TELESCOP  [ prose of the telescope name ]
+      APERTURE  [ area of effective aperature in m-squared ]
+      FOCALLEN  [ effective focal length with barlow/reducer ]
+      CAMERA    [ prose of camera ]
+      DETECTOR  [ prose of the detector ]
+   -z --zone timezone (camera works in local time)
+
+The camera writes a very limited amount of information into its DICOM
+header. This program augments that data with
+
+1) A log file of the observing. One line per file,
+   filename, and the data
+2) A site file (probably have to make one of these for all observations)
+3) a list of observers
+4) a file to describe the instrument used.
+
+The -z switch sets the timezone. Really can not count on the system
+knowing this. Really, you can't. It is HH:MM w.r.t. Greenwich. Negative
+for WEST timezones. Mountain time is -06:00 during the summer and -05:00
+during winter.
+
+
+   [options] files...
+   CATALOG    [name of the database ]
+   OBJECT     [database main id prose ]
+   OBJECTID   [key for database ]
+   IMAGETYP   one of ['object','zero','dark','flat','domeflat','skyflat','focus' ]
+   FILTER     [prose name of filter at site ]
+   CCDSUM     [nx ny [residualx,residualy]] if n=3 and NAXIS mod n has a residual
+              residual can be stated. (IfA)
+   OBSERVER   OBSERVxx [ name of the observer(s) ]
+   SITE       [prose of telescope/observatory name ]
+   RA         [sexigesimal ra ]
+   DEC        [sexigesimal dec ]
+   RA-TARG    [decimal degrees ra ]  -- easier to work with
+   DEC-TARG   [decimal degrees dec ]
+   ROTANG     [rotation in degrees + is CCW range [0..360) ]
+   RADESYS    ICRS
+   DATE-OBS   [ YYYY-MM-DDTHH:MM:SS.SSSsssZ  start of obs]
+   DATE-MJD
+   TIMESYS    [ UTC (or other) ]
+   EXPTIME    [ time detector accepting photons ]
+   GAIN
+   RDNOISE (may be subjective)
+   INSTRUME  [ prose of the instrument [site s/n]]
+   TELESCOP  [ prose of the telescope name ]
+   APERTURE  [ area of effective aperature in m-squared ]
+   FOCALLEN  [ effective focal length with barlow/reducer ]
+   CAMERA    [ prose of camera ]
+   DETECTOR  [ prose of the detector ]
+
+   Data sections: Some detectros have more than one readout circuit. This
+   has significant implications in noise frames.
+   DATASEC[n] [data array (pixel) coordinates ]
+   CCDSEC[n]
+   DETSEC[n]
+   AMPSEC[n]
+   Site location....I prefer OBSGEO, that uses  IAU 1976 ellipsoid
+   XDATUM   [ prose of the geodetic datum for geo coords ]
+   OBSGEO-B Latitude [ degrees ]
+   OBSGEO-L Longitude [ degrees ]
+   OBSGEO-H Height above datum [ meters ]
+
+   BUT! our gps's use WGS-84, and that will change real soon.
+   All this can be handled in Astropy.
+
+   Other things like
+   AIRMASS
+   MOONANGL   [ degrees ]
+   SUNANGLE   [ degrees ]
+   EXPSTART   [ start of exposure in MJD ]
+   EXPEND     [ end of exposuire in MJD ]
+
+   ROOTNAME   [ root name of the file ]
+   FILETYPE   [ 'RAW IMAGE' ]
+
+
+"""
+
+
+##############################################################################
+# DCM2FITSException
+#
+##############################################################################
+class DCM2FITSException(Exception):
+   """Special exception to allow differentiated capture of exceptions"""
+   def __init__(self,message,errors=None):
+      super(DCM2FITSException,self).__init__("DCM2FITS "+ message)
+      self.errors = errors
+   @staticmethod
+   def __format__(e):
+      return "DCM2FITS" % e
+# DCM2FITSException
+
+
+
+##############################################################################
+# DCM2FITS
+#
+##############################################################################
+class MyApp(QMainWindow, Ui_DICOM2fits): # DCM2FITS
+   """ Manage the work for converting a batch of DCM files to FITS files.
+     Now we process each file, update base headers, and go for it.
+     FITS              TUCSEN keywords
+     "filename"        'BitsAllocated'
+     "ccdtemp"         'BitsStored'
+     "filter"          'Columns'
+     "filetype"        'ContentDate'
+     "exptime"         'ContentTime'
+     "catalog"         'HighBit'
+     "objectid"        'InstitutionName'
+     "ra"              'Manufacturer'
+     "dec"             'ManufacturerModelName'
+     "ra-targ"         'NumberOfFrames'
+     "dec-targ"        'PhotometricInterpretation'
+     "object"          'PixelData'
+                       'PixelRepresentation'
+                       'PlanarConfiguration'
+                       'Rows'
+                       'SamplesPerPixel'
+                       'SeriesDate'
+                       'StudyDate'
+                       'StudyTime'
+   """
+   # class variables for generating the template files.
+   header_template = {
+      "CATALOG"   : fits.Card( "CATALOG"    ,"",       "name of the database"),
+      "OBJECT"    : fits.Card( "OBJECT"     ,"",       "database main id prose"),
+      "OBJECTID"  : fits.Card( "OBJECTID"   ,"",       "key for database"),
+      "IMAGETYP"  : fits.Card( "IMAGETYP"   ,"object", "'zero','dark','object','flat','domeflat','skyflat','focus'"),
+      "FILTER"    : fits.Card( "FILTER"     ,"open",   "prose name of filter at site"),
+      "CCDSUM"    : fits.Card( "CCDSUM"     ,"1 1",    "nx ny"),
+      "OBSERVER"  : fits.Card( "OBSERVER"   ,"",       "name of the observer(s) OBSERVxx for more"),
+      "SITE"      : fits.Card( "SITE"       ,"",       "prose of telescope,observatory name"),
+      "RA"        : fits.Card( "RA"         ,"",       "sexigesimal ra"),
+      "DEC"       : fits.Card( "DEC"        ,"",       "sexigesimal dec"),
+      "RA-TARG"   : fits.Card( "RA-TARG"    ,"",       "decimal degrees ra"),
+      "DEC-TARG"  : fits.Card( "DEC-TARG"   ,"",       "decimal degrees dec"),
+      "ROTANG"    : fits.Card( "ROTANG"     ,"0",      "rotation in degrees + is CCWrange [0..360)"),
+      "RADESYS"   : fits.Card( "RADESYS"    ,"ICRS"    "FKS4 FKS4"),
+      "DATE-OBS"  : fits.Card( "DATE-OBS"   ,"",       "YYYY-MM-DDTHH:MM:SS.SSSsssZ start of obs"),
+      "DATE-MJD"  : fits.Card( "DATE-MJD"   ,"",       "computed"),
+      "TIMESYS"   : fits.Card( "TIMESYS"    ,"",       "UTC (or other)"),
+      "EXPTIME"   : fits.Card( "EXPTIME"    ,"",       "time detector accepting photons"),
+      "GAIN"      : fits.Card( "GAIN"       ,"",       "subjective"),
+      "RDNOISE"   : fits.Card( "RDNOISE"    ,"",       "subjective"),
+      "INSTRUME"  : fits.Card( "INSTRUME"   ,"",       "prose of the instrument [site s/n]"),
+      "TELESCOP"  : fits.Card( "TELESCOP"   ,"",       "prose of the telescope name"),
+      "APERTURE"  : fits.Card( "APERTURE"   ,"",       "area of effective aperature in m-squared"),
+      "FOCALLEN"  : fits.Card( "FOCALLEN"   ,"",       "effective focal length with barlow/reducer"),
+      "CAMERA"    : fits.Card( "CAMERA"     ,"",       "prose of camera"),
+      "DETECTOR"  : fits.Card( "DETECTOR"   ,"",       "prose of the detector"),
+      "TEMPERAT"  : fits.Card( "TEMPERAT"   ,"",       "Sensor Temperature [ deg c]"),
+      "DATASEC"   : fits.Card( "DATASEC"    ,"",       "default to NAXIS1,2"),
+      "XDATUM"    : fits.Card( "XDATUM"     ,"",       "prose of the geodetic datum for geo coords"),
+      "OBSGEO-B"  : fits.Card( "OBSGEO-B"   ,"",       "Latitude [ degrees ]"),
+      "OBSGEO-L"  : fits.Card( "OBSGEO-L"   ,"",       "Longitude [ degrees  ]"),
+      "OBSGEO-H"  : fits.Card( "OBSGEO-H"   ,"",       "Height above datum [ meters ]"),
+      "AIRMASS"   : fits.Card( "AIRMASS"    ,"",       "[computed]"),
+      "MOONANGL"  : fits.Card( "MOONANGL"   ,"",       "[degrees]"),
+      "SUNANGLE"  : fits.Card( "SUNANGLE"   ,"",       "[degrees]"),
+      "EXPSTART"  : fits.Card( "EXPSTART"   ,"",       "start of exposure in MJD"),
+      "EXPEND"    : fits.Card( "EXPEND"     ,"",       "end of exposuire in MJD"),
+      "ROOTNAME"  : fits.Card( "ROOTNAME"   ,"$HOME/AAATODAY", "root name of the file"),
+      "FILETYPE"  : fits.Card( "FILETYPE"   ,"RAW",    "prose 'CALIBRATED' or 'RAW'")
+      }
+
+   # Spreadsheet comma separated, double-quoted text fields
+
+   csv_template = """Keyword,Value,Comment
+   "CATALOG","","name of the database"
+   "OBJECT","","database main id prose"
+   "OBJECTID","","key for database"
+   "IMAGETYP","","'zero';'dark';'object';'flat';'domeflat';'skyflat';'focus'"
+   "FILTER","","prose name of filter at site"
+   "CCDSUM","","nx ny"
+   "OBSERVER","","name of the observer(s) OBSERVxx for more"
+   "RA","","sexigesimal ra"
+   "DEC","","sexigesimal dec"
+   "RA-TARG","","decimal degrees ra"
+   "DEC-TARG","","decimal degrees dec"
+   "ROTANG","","rotation in degrees + is CCWrange [0..360)"
+   "RADESYS","ICRS"  "FKS4 FKS4"
+   "DATE-OBS","","YYYY-MM-DDTHH:MM:SS.SSSsssZ start of obs"
+   "DATE-MJD","","computed"
+   "TIMESYS","UTC","UTC (or other)"
+   "EXPTIME","","time detector accepting photons"
+   "MOONANGL","","[degrees]"
+   "SUNANGLE","","[degrees]"
+   "EXPSTART","","start of exposure in MJD"
+   "EXPEND","","end of exposuire in MJD"
+   "ROOTNAME","","root name of the file"
+   "FILETYPE","RAW","prose 'CALIBRATED' or 'RAW'"
+   """
+
+   site_template = """Keyword,Value,Comment
+   "SITE","","prose of telescope,observatory name"
+   "XDATUM","","prose of the geodetic datum for geo coords"
+   "OBSGEO-B","","Latitude [ degrees ]"
+   "OBSGEO-L","","Longitude [ degrees  ]"
+   "OBSGEO-H","","Height above datum [ meters ]"
+   "AIRMASS","","[computed]"
+   """
+
+   instrument_template = """Keyword,Value,Comment
+   "GAIN","","subjective"
+   "RDNOISE","","subjective"
+   "INSTRUME","","prose of the instrument [site sn]"
+   "TELESCOP","","prose of the telescope name"
+   "APERTURE","","area of effective aperature in m-squared"
+   "FOCALLEN","","effective focal length with barlow-reducer"
+   "CAMERA","","prose of camera"
+   "DETECTOR","","prose of the detector"
+   "TEMPERAT","","Sensor temperature [ deg C]"
+   "DATASEC","","default to NAXIS1,2"
+   """
+
+   observer_template = """Keyword,Value,Comment
+   "OBSERVER","HERO","Proimary observers name"
+   "OBSERV01","SIDEKICK","Ancillary people"
+   """
+
+   log_template = """\"filename","temperat","filter","filetype","exptime","catalog","objectid","ra","dec","ra-targ","dec-targ","object"
+   """
+
+   badcolor  = "background-color: red"
+   goodcolor = "background-color: lime"
+   warncolor = "background-color: yellow"
+
+   __fitsre = re.compile(r'(fit|fits|fts)',re.IGNORECASE) # drag/drop
+
+   def __init__(self,filebase=""):                 # DCM2FITS::__init__()
+      """Open a dialog, accept a file or browse to one, open it
+       and prepare a spreadsheet for all the extensions.
+       Then if saved, reopen and load all the data.
+       Widget            Type
+       self.BrowseSite          QPushButton
+       self.BrowseInstrument    QPushButton
+       self.BrowseObservers     QPushButton
+       self.BrowseLog           QPushButton
+       self.RunButton           QPushButton
+       self.BrowseLog           QLineEdit
+       self.SitePath            QLineEdit
+       self.InstrumentPath      QLineEdit
+       self.ObserversPath       QLineEdit
+       self.LogPath             QLineEdit
+       self.ReportWindow        QPlainTextEdit
+       self.TZHours             QSpinBox
+       self.TZMinutes           QSpinBox
+       self.statusbar           QStatusBar
+       """
+      QMainWindow.__init__(self)
+      Ui_DICOM2fits.__init__(self)
+      self.warnings = []    # warnings in order of occurance.
+      self.setupUi(self)
+
+      self.filebase      = filebase
+      self.logfile       = None   # the raw csv file
+      self.site          = None   # the raw csv file
+      self.instrument    = None   # the raw csv file
+      self.observers     = None   # the raw csv file
+      self.logcsv        = None   # the pandas csv file
+      self.sitecsv       = None   # the pandas csv file
+      self.instrumentcsv = None   # the pandas csv file
+      self.observerscsv  = None   # the pandas csv file
+      self.baseheader    = fits.header.Header() # collection of headers for run
+      self.mias          = []     # missing-in-action header values.
+      self.msgs          = ""     # accumulate error messages
+      self.cards         = []     # cards for the header
+      self.basedir       = os.getenv('HOME')+'/dicom2fits'
+      self.readini()
+      self.actionOpen.            triggered.connect(self.mymenuOpen)
+      self.actionMake_Tremplates. triggered.connect(self.myMakeTemplates)
+      self.actionClose.           triggered.connect(self.myClose)
+      self.actionAbout.           triggered.connect(self.myAbout)
+      self.BrowseSite.            clicked.connect(self.acquire_site)
+      self.BrowseSite.            setStyleSheet(MyApp.badcolor)
+      self.BrowseInstrument.      clicked.connect(self.acquire_instrument)
+      self.BrowseInstrument.      setStyleSheet(MyApp.badcolor)
+      self.BrowseObservers.       clicked.connect(self.acquire_observer)
+      self.BrowseObservers.       setStyleSheet(MyApp.badcolor)
+      self.BrowseLog.             clicked.connect(self.acquire_log)
+      self.BrowseLog.             setStyleSheet(MyApp.badcolor)
+      self.RunButton.             clicked.connect(self.unimplemented)
+      self.RunButton.             setStyleSheet(MyApp.badcolor)
+      self.TZHours.               valueChanged.connect(self.acquire_timezone)
+      self.TZHours.               setStyleSheet(MyApp.warncolor)
+      self.TZMinutes.             valueChanged.connect(self.acquire_timezone)
+      self.TZMinutes.             setStyleSheet(MyApp.warncolor)
+      self.timezone       = "-05:00"  # human readable format remove : for time.
+
+   ### DCM2FITS.__init__()
+
+   def readini(self):                              # DCM2FITS::readini
+      """Get an ini file if exists"""
+      pass
+
+   ### DCM2FITS.readini()
+
+   def unimplemented(self):                        # DCM2FITS::unimplemented()
+      """Place holder"""
+      msgBox = QMessageBox()
+      msgBox.setWindowTitle("Function is unimplemented.")
+      msgBox.setText("Function is unimplemented.")
+      msgBox.exec()
+
+   ### DCM2FITS.unimplemented()
+
+   def acquire_timezone(self):                     # DCM2FITS::acquire_timezone()
+      """Get the timezone information. Either spinner causes a complete
+      read and make."""
+      tzhours = self.TZHours.value()
+      tzminutes = self.TZMinutes.value()
+      ret = "{:=03d}:{:02d}".format(tzhours,tzminutes).strip()
+      if(tzhours >= 0):  # trim out the leading extra zero for positive values.
+         ret = ret[1:]
+      print(ret)
+      self.timezone = ret
+      self.TZHours.setStyleSheet(MyApp.goodcolor)
+      self.TZMinutes.setStyleSheet(MyApp.goodcolor)
+      # return self
+   ### DCM2FITS.acquire_timezone()
+      
+   def reinitialize(self):                         # DCM2FITS::reinitialize()
+      """Pop up dialog and get the file."""
+      #filepath, filtertxt = QtWidgets.QFileDialog(self).getOpenFileName(None, 'Open Site File',selectedFilter=startpat)
+      self.site          = None   # the raw csv file
+      self.instrument    = None   # the raw csv file
+      self.observers     = None   # the raw csv file
+      self.logcsv        = None   # the pandas csv file
+      self.sitecsv       = None   # the pandas csv file
+      self.instrumentcsv = None   # the pandas csv file
+      self.observerscsv  = None   # the pandas csv file
+      self.baseheader    = fits.header.Header() # collection of headers for run
+      self.mias          = []     # missing-in-action header values.
+      self.msgs          = ""     # accumulate error messages
+      self.cards         = []     # cards for the header
+      self.basedir       = os.getenv('HOME')+'/dicomfits'
+      self.readini()
+      return self
+   ### DCM2FITS.reinitialize()
+
+   def readini(self):                              # DCM2FITS""readini
+      """Get an ini file if exists"""
+      pass
+
+   ### DCM2FITS.readini
+      
+   def acquire_site(self):                         # DCM2FITS::acquire_site()
+      """Pop up dialog and get the file."""
+      filepath, filtertxt = QtWidgets.QFileDialog.getOpenFileName(None, 'Open Site File',
+                                                                        self.basedir,"*.csv")
+      self.site          = filepath   # the raw csv file
+      self.SitePath.setText(filepath)
+      return self
+
+   ### DCM2FITS.acquire_site()
+   
+   def acquire_instrument(self):                    # DCM2FITS::acquire_instrument()
+      """Pop up dialog and get the file.""" 
+      filepath, filtertxt = QtWidgets.QFileDialog.getOpenFileName(None, 'Open Instrument File',
+                                                                  self.basedir,"*.csv")
+      self.instrument    = filepath   # the raw csv file
+      self.InstrumentPath.setText(filepath)
+      return self
+
+   ### DCM2FITS.acquire_instrument()
+
+   def acquire_observer(self):                           # DCM2FITS::acquire_observer()
+      """Pop up dialog and get the file."""
+      filepath, filtertxt = QtWidgets.QFileDialog.getOpenFileName(None, 'Open Observer File',
+                                                                  self.basedir,"*.csv")
+      self.observers      = filepath   # the raw csv file
+      self.ObserversPath.setText(filepath)
+      return self
+
+   ### DCM2FITS.acquire_observer()
+   
+   def acquire_log(self):                                 # DCM2FITS::acquire_log()
+      """Pop up dialog and get the file."""
+      filepath, filtertxt = QtWidgets.QFileDialog.getOpenFileName(None, 'Open Log File',
+                                                                  self.basedir,"*.csv")
+      self.logfile       = filepath   # the raw csv file
+      self.LogPath.setText(filepath)
+      return self
+
+   ### DCM2FITS.acquire_site()
+   
+   
+   def initialize(self):                           # DCM2FITS::initialize()
+      """(Re)-initialize separately from declaration"""
+      self.msgs          = ""         # reset the messages, we're a loopin GUI.
+      self.logcsv        = pd.read_csv(self.logfile)
+      self.sitecsv       = pd.read_csv(self.site)
+      self.instrumentcsv = pd.read_csv(self.instrument)
+      self.observerscsv  = pd.read_csv(self.observers)
+      if self.logcsv        is None: msg += "Error reading csv file {}".format("logfile")
+      if self.sitecsv       is None: msg += "Error reading csv file {}".format("site")
+      if self.instrumentcsv is None: msg += "Error reading csv file {}".format("instrument")
+      if self.observerscsv  is None: msg += "Error reading csv file {}".format("observers")
+
+      #self.baseheader.set("SIMPLE" , "T7"   , "conforms to FITS standard"  )
+      #self.baseheader.set("BITPIX" , 16     , "array data type"            )
+      #self.baseheader.set("NAXIS"  , 2      , "number of array dimensions" )
+      #self.baseheader.set("NAXIS1" , 5472    )
+      #self.baseheader.set("NAXIS2" , 3648    )
+      #self.baseheader.set("EXTEND" , "T"     )
+      #self.baseheader.set("BSCALE" , 1       )
+      #self.baseheader.set("BZERO"  , 32768   )
+      self.baseheader.set("DATE-OBS"  , "2019-01-01T00:00:00.0Z"   )
+      mias  = []
+      cards = []
+      gencards("site"      ,sitecsv      ,cards, mias)
+      gencards("instrument",instrumentcsv,cards, mias)
+      gencards("observers" ,observerscsv ,cards, mias)
+
+      if(len(self.mias) == 0 and len(self.msg) == 0):
+         for c in self.cards:
+            self.baseheader.append(c)
+
+      return self
+
+   ### DCM2FITS.initialize()
+
+   def debug(self,msg="",os=sys.stderr):           # DCM2FITS::debug()
+      """Help with momentary debugging, file to fit."""
+      print("DCM2FITS - %s " % msg, file=os)
+      for key,value in self.__dict__.items():
+         print("%20s = %s" % (key,value),file=os)
+
+      return self
+
+   ### DCM2FITS.debug()
+
+   def generate_templates(self):                   # DCM2FITS::generate_templates()
+      """Generate the template files. The MakeTemplates dialog will
+      assist with which ones and where they will go."""
+      if(1):
+         for template in options.csvtemplate:
+            {'log'        : lambda a : print(log_template,
+                                             file=open('log_template.csv','w')),
+             'site'       : lambda a : print(site_template,
+                                             file=open('site_template.csv','w')),
+             'instrument' : lambda a : print(instrument_template,
+                                             file=open('instrument_template.csv','w')),
+             'observer'   : lambda a : print(observer_template,
+                                             file=open('observer_template.csv','w'))
+            }.get(template,lambda a: print('Template option {} missing'.format(a),
+                      file=sys.stderr))(template)
+
+   ### DCM2FITS.generate_templates()
+
+   def missing(self,val):                          # DCM2FITS::missing()
+      """See if val is a missing spreadsheet value"""
+      valtype = "{}".format(type(val)) # a real hack
+      ret = False
+      if('float' in valtype and np.isnan(val)):
+         ret = True
+      if('str' in valtype and val==''):
+         ret = True
+      if(ret):
+         self.msgs += "Spreadsheet missing {}".format(val)
+      return ret
+   ### DCM2FITS..missing()
+
+   def gencards(self,setname,df,cards,mias):       # DCM2FITS::gencards()
+      """Given the pandas df for setname, add a new card to cards
+     array, or a message to mias"""
+      for idx,row in df.iterrows():
+         keyword,value,comment = row
+         if(missing(value)):
+            mias.append("{} keyword {} missing value.".format(setname,keyword))
+         if(not missing(comment)):
+            cards.append(fits.Card(keyword,value,comment))
+         else:
+            cards.append(fits.Card(keyword,value))
+      return self
+
+   ### DCM2FITS.gencards()
+
+   __DCM2FITS_debug = debug  # preserve our debug name if we're inherited
+
+   def convert(self):                              # DCM2FITS::convert()
+      """Convert the logfile to fits"""
+      h = {}
+      for idx,row in self.logcsv.iterrows():  # PDB-DEBUG
+         filename    = row['filename']
+         fileheader  = copy.deepcopy(self.baseheader)
+         headercards = fileheader.cards
+         for k,v in row.items():
+            hk = k.upper()
+            if(hk not in fileheader):
+               msg += "{} key not recognized".format(hk)
+            else:
+               card = headercards[hk].value = v
+
+         ds = pydicom.dcmread(filename)  # plan dataset
+         fitsfilename = __spaces__.sub('_','.'.join(filename.split('.')[:-1]+['fits']))
+
+         sdate = ds.data_element('StudyDate').value
+         tdate  = "{}-{}-{}".format(sdate[:4],sdate[4:6],sdate[6:])
+         stime = ds.data_element('StudyTime').value
+         stime = ds.data_element('StudyTime').value
+
+         rawtimeobs = tdate+'T'+stime+'.0'
+         localdate = astime.Time([rawtimeobs]).datetime[0]
+         z = self.timezone
+         h,m = map(float,z.split(':'))
+         tdelta = datetime.timedelta(hours=h,minutes=m)
+         utctimeobs = localdate-tdelta
+         timeobs=utctimeobs.strftime("%Y-%m-%dT%H:%M:%S.0Z")
+         if('DATE-OBS' in fileheader):
+            card = headercards['DATE-OBS'].value = timeobs
+         d  = ds.pixel_array
+         nf = fits.PrimaryHDU(d,fileheader)
+         nf.writeto(fitsfilename,output_verify='fix',overwrite=True)
+   ### DCM2FITS.convert()
+
+   def mymenuOpen(self):                         # MyApp::mymenuOpen()
+      pass
+   def myMakeTemplates(self):                    # MyApp::myMakeTemplates()
+      pass
+   def myClose(self):                            # MyApp::myClose()
+      pass
+   def myAbout(self):                            # MyApp::myAbout()
+      pass
+
+#   def dragEnterEvent(self, e):
+#      """Handle the drag/drop"""
+#      self.droppedfiles = []
+#      for u in e.mimeData().urls():
+#         apath = u.path()
+#         if(MyApp.__fitsre.search(apath)):
+#            self.droppedfiles.append(apath)
+#            print(apath)
+#      if(len(self.droppedfiles) != 0):
+#         e.accept()
+#      else:
+#         e.ignore() 
+#
+#   def dropEvent(self, e):
+#     """The drop event"""
+#     print("Drop event")
+#     if(len(self.droppedfiles) != 0):
+#        self.loadfile(self.droppedfiles[0])
+
+
+# class DCM2FITS
+
+
+##############################################################################
+# MyApp
+#
+##############################################################################
+class xxMyApp(QMainWindow, Ui_DICOM2fits):
+   """ Open a dialog, accept a file or browse to one, open it
+       and prepare a spreadsheet for all the extensions.
+       Then if saved, reopen and load all the data.
+       Widget            Type
+       self.BrowseSite          QPushButton
+       self.BrowseInstrument    QPushButton
+       self.BrowseObservers     QPushButton
+       self.BrowseLog           QLineEdit
+       self.SitePath            QLineEdit
+       self.InstrumentPath      QLineEdit
+       self.ObserversPath       QLineEdit
+       self.LogPath             QLineEdit
+       self.ReportWindow        QPlainTextEdit
+       self.RunButton           QPushButton
+       self.TZHours             QSpinBox
+       self.TZMinutes           QSpinBox
+       self.statusbar           QStatusBar
+
+   """
+
+   def __init__(self):                             # MyApp::__init__()
+      """Initialize this class."""
+      QMainWindow.__init__(self)
+      Ui_MainWindow.__init__(self)
+      self.warnings = []    # warnings in order of occurance.
+      
+      self.setupUi(self)
+
+      # tie in the menu actions...
+
+      
+      self.lineEdit.acceptDrops(True)
+
+   ### MyApp.__init__()
+
+   def debug(self,msg="",os=sys.stderr):           # MyApp::debug()
+      """Help with momentary debugging, file to fit."""
+      print("MyApp - %s " % msg, file=os)
+      for key,value in self.__dict__.items():
+         print("%20s = %s" % (key,value),file=os)
+
+      return self
+
+   ### MyApp.debug()
+   __MyApp_debug = debug  # preserve our debug name if we're inherited
+
+   def mymenuOpen(self):                         # MyApp::mymenuOpen()
+      pass
+   def myMakeTemplates(self):                    # MyApp::myMakeTemplates()
+      pass
+   def myClose(self):                            # MyApp::myClose()
+      pass
+   def myAbout(self):                            # MyApp::myAbout()
+      pass
+
+
+# class MyApp
+
+##############################################################################
+#                                    Main
+#                               Regression Tests
+##############################################################################
+# HEREHEREHERE
+if __name__ == "__main__":
+
+   try:
+      app   = QApplication(sys.argv) # PDB-DEBUG
+      window = MyApp()
+      window.show()
+      sys.exit(app.exec_())
+   except:
+      sys.exit(1)
+
