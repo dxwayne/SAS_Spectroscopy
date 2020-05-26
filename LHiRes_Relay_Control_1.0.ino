@@ -3,8 +3,6 @@
  * The purpose for this sketch is to control relays and therefore the
  *    switches on the LHiRes spectrograph in the modes of "Flat" and "Calibrate".
  * 
- * Arduino Uno or Nano along with a 2 or four relay board
- * 
  * The pinout for this configuration is as follows:
  *    Arduino PIN 6 = Relay #1 trigger or TTL input
  *    Arduino PIN 7 = Relay #2 trigger or TTL input
@@ -23,8 +21,8 @@
  *    LED #1 with series 220 Ohm or greater resistor from Arduino PIN 8
  *    LED #2 with series 220 Ohm or greater resistor from Arduino PIN 9
  *    
- * We want to control the Arduino using a USB interface to a computer so
- * we will utilize the Serial component in the sketch and 9600 baud is
+ * We want to control the Ardion using a USB interface to a computer so
+ * we will utilie the Serial component in the sketch and 9600 baud is
  * sufficent for communication speed. An external program can be written
  * to send and recieve serial commands to and from the Arduino.
  * 
@@ -223,3 +221,4 @@ void ledOnOff(int ledID, int ledState){
       break;
   }
 }
+
